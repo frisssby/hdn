@@ -7,12 +7,22 @@ Hash delivery network is a **tcp** server that supports storing hashes in a remo
 ```bash
 git clone git@github.com:frisssby/hdn.git
 cd hdn
-cargo run --ip=<ip> --port=<port>
+cargo run --ip <IP> --port <PORT>
 ```
 
 ## Protocol
 
-Communication with the server occurs through **json** messages. There are two types of valid requests:
+Communication with the server occurs through **json** messages.
+
+After the successful connection, the client receives a greeting message:
+
+```json
+  {
+    "student_name" : "Elina Safarova",
+  }
+```
+
+There are two types of valid requests:
 
 + **Store** a *hash* under a *key*
 
