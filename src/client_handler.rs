@@ -5,9 +5,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{io::Write, net::TcpStream};
 
-const STUDENT_NAME: &str = "Elina Safarova";
+mod response_status {
+    pub const SUCCESS: &str = "success";
+    pub const NO_KEY: &str = "key not found";
+    pub const INVALID_REQUEST: &str = "invalid request";
+}
+
+mod query_type {
+    pub const LOAD_QUERY: &str = "load";
+    pub const STORE_QUERY: &str = "store";
+}
 
 pub fn handle_connection(mut stream: TcpStream, storage: Storage) {
+    const STUDENT_NAME: &str = "Elina Safarova";
     let greeting = serde_json::to_vec(&json!({ "student_name": STUDENT_NAME })).unwrap();
     stream.write_all(&greeting).unwrap();
     let mut de = serde_json::Deserializer::from_reader(stream.try_clone().unwrap());
@@ -20,7 +30,7 @@ pub fn handle_connection(mut stream: TcpStream, storage: Storage) {
                     error!("couldn't read the request {err}");
                     panic!("{err}");
                 } else {
-                    json!({ "response_status": Response::INVALID_REQUEST })
+                    json!({ "response_status": response_status::INVALID_REQUEST })
                 }
             }
         };
@@ -38,28 +48,28 @@ fn form_response(query: Query, storage: Storage) -> Value {
         hash,
     } = query;
     match request_type.as_str() {
-        Query::STORE_QUERY => {
+        query_type::STORE_QUERY => {
             let hash = hash.unwrap();
             info!("got store request with key=\"{key}\" and value=\"{hash}\"");
             let mut storage_guard = storage.lock().unwrap();
             storage_guard.insert(key, hash);
-            json!({ "response_status": Response::SUCCESS })
+            json!({ "response_status": response_status::SUCCESS })
         }
-        Query::LOAD_QUERY => {
+        query_type::LOAD_QUERY => {
             let storage_guard = storage.lock().unwrap();
             if let Some(hash) = { storage_guard.get(&key) } {
                 info!("got load request with key=\"{key}\"");
                 json!({
-                    "response_status": Response::SUCCESS,
+                    "response_status": response_status::SUCCESS,
                     "requested_key" : key,
                     "requested_hash": hash,
                 })
             } else {
-                json!({ "response_status": Response::NO_KEY })
+                json!({ "response_status": response_status::NO_KEY })
             }
         }
         _ => {
-            json!({ "response_status": Response::INVALID_REQUEST })
+            json!({ "response_status": response_status::INVALID_REQUEST })
         }
     }
 }
@@ -70,16 +80,4 @@ struct Query {
     pub key: Key,
     #[serde(default)]
     pub hash: Option<Hash>,
-}
-
-impl Query {
-    const LOAD_QUERY: &str = "load";
-    const STORE_QUERY: &str = "store";
-}
-struct Response;
-
-impl Response {
-    const SUCCESS: &str = "success";
-    const NO_KEY: &str = "key not found";
-    const INVALID_REQUEST: &str = "invalid request";
 }
