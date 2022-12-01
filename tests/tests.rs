@@ -256,3 +256,20 @@ fn test_client_close_both_connections() {
     client.expect_no_response();
     assert!(server.is_alive());
 }
+
+#[test]
+fn test_tricky_symbols() {
+    let server = ServerWrapper::start(IpVersion::V4);
+
+    let mut client = Client::start(server.address).unwrap();
+    client.expect_response(&successful_connection());
+
+    client.store("{key}", "{hash}").unwrap();
+    client.expect_response(&successful_store());
+
+    client.load("{key}").unwrap();
+    client.expect_response(&successful_load("{key}", "{hash}"));
+
+    client.load("\"key\"").unwrap();
+    client.expect_response(&key_not_found());
+}
