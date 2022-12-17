@@ -1,0 +1,10 @@
+{
+    "user": "Elina Safarova",
+    "nodes": [
+        "127.0.0.1",
+        "127.0.0.2"
+    ],
+    "id": 0,
+    "client_port": 43000,
+    "peer_port": 42000
+}

@@ -1,6 +1,6 @@
-use rand::Rng;
 use serde::de::Deserialize;
 use serde_json::{de::IoRead, json, Value};
+use serial_test::serial;
 use std::{
     io::{self, prelude::*},
     net::{IpAddr, Shutdown, SocketAddr, TcpStream},
@@ -17,31 +17,16 @@ fn take_a_nap() {
     thread::sleep(Duration::from_millis(100));
 }
 
-enum IpVersion {
-    V4,
-    V6,
-}
-
 struct ServerWrapper {
     process: Option<Child>,
     address: SocketAddr,
 }
 
 impl ServerWrapper {
-    fn start(ip_version: IpVersion) -> Self {
-        let mut rng = rand::thread_rng();
-        let port = rng.gen_range(40000..49151);
-        let ip = match ip_version {
-            IpVersion::V4 => IpAddr::from_str("127.0.0.1").unwrap(),
-            IpVersion::V6 => IpAddr::from_str("::1").unwrap(),
-        };
-        let process = Command::new(BINARY_PATH)
-            .arg("--ip")
-            .arg(ip.to_string())
-            .arg("--port")
-            .arg(port.to_string())
-            .spawn()
-            .unwrap();
+    fn start() -> Self {
+        let ip = IpAddr::from_str("127.0.0.1").unwrap();
+        let port = 43000u16;
+        let process = Command::new(BINARY_PATH).spawn().unwrap();
         take_a_nap();
         Self {
             process: Some(process),
@@ -158,8 +143,9 @@ fn invalid_request() -> Value {
 }
 
 #[test]
+#[serial(timeout_ms = 1000)]
 fn test_one_client() {
-    let server = ServerWrapper::start(IpVersion::V4);
+    let server = ServerWrapper::start();
 
     let mut client = Client::start(server.address).unwrap();
     client.expect_response(&successful_connection());
@@ -175,16 +161,9 @@ fn test_one_client() {
 }
 
 #[test]
-fn test_ip_v6() {
-    let server = ServerWrapper::start(IpVersion::V6);
-
-    let mut client = Client::start(server.address).unwrap();
-    client.expect_response(&successful_connection());
-}
-
-#[test]
+#[serial(timeout_ms = 1000)]
 fn test_multiple_clients() {
-    let server = ServerWrapper::start(IpVersion::V4);
+    let server = ServerWrapper::start();
 
     let mut london = Client::start(server.address).unwrap();
     london.expect_response(&successful_connection());
@@ -209,8 +188,9 @@ fn test_multiple_clients() {
 }
 
 #[test]
+#[serial(timeout_ms = 1000)]
 fn test_invalid_request() {
-    let mut server = ServerWrapper::start(IpVersion::V4);
+    let mut server = ServerWrapper::start();
 
     let mut client = Client::start(server.address).unwrap();
     client.expect_response(&successful_connection());
@@ -234,8 +214,10 @@ fn test_invalid_request() {
 }
 
 #[test]
-fn client_close_write_connection() {
-    let mut server = ServerWrapper::start(IpVersion::V4);
+#[serial(timeout_ms = 1000)]
+
+fn test_client_close_write_connection() {
+    let mut server = ServerWrapper::start();
 
     let mut client = Client::start(server.address).unwrap();
     client.expect_response(&successful_connection());
@@ -247,8 +229,10 @@ fn client_close_write_connection() {
 }
 
 #[test]
+#[serial(timeout_ms = 1000)]
+
 fn test_client_close_both_connections() {
-    let mut server = ServerWrapper::start(IpVersion::V4);
+    let mut server = ServerWrapper::start();
 
     let mut client = Client::start(server.address).unwrap();
     client.shutdown(Shutdown::Both);
@@ -258,8 +242,9 @@ fn test_client_close_both_connections() {
 }
 
 #[test]
+#[serial(timeout_ms = 1000)]
 fn test_tricky_symbols() {
-    let server = ServerWrapper::start(IpVersion::V4);
+    let server = ServerWrapper::start();
 
     let mut client = Client::start(server.address).unwrap();
     client.expect_response(&successful_connection());
@@ -270,6 +255,9 @@ fn test_tricky_symbols() {
     client.load("{key}").unwrap();
     client.expect_response(&successful_load("{key}", "{hash}"));
 
-    client.load("\"key\"").unwrap();
+    client.store("\"key\"", "{\"hash\"}").unwrap();
+    client.expect_response(&successful_store());
+
+    client.load("key").unwrap();
     client.expect_response(&key_not_found());
 }

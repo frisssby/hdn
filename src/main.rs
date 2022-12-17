@@ -1,17 +1,9 @@
-use clap::Parser;
 use simplelog::*;
-use std::net::IpAddr;
 
-#[derive(Debug, Parser)]
-struct Opts {
-    #[clap(short, long)]
-    ip: IpAddr,
-
-    #[clap(short, long)]
-    port: u16,
-}
+use hdn::node::{Node, NodeConfig};
 
 fn main() {
+    std::env::set_var("HDN_CONFIG", "/home/frisssby/hdn/config/config.json");
     TermLogger::init(
         LevelFilter::Info,
         Config::default(),
@@ -19,7 +11,7 @@ fn main() {
         ColorChoice::Auto,
     )
     .unwrap();
-
-    let opts = Opts::parse();
-    hdn::run(opts.ip, opts.port);
+    let config = NodeConfig::build();
+    let node = Node::init(config);
+    node.launch();
 }
