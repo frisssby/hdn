@@ -1,5 +1,5 @@
 use crate::{
-    agent::{Client, HdnAgent, Peer},
+    agent::{HdnAgent},
     messages::{Greeting, Load, PeerUpdate, Request, Response, Store},
     storage::{Storage, Time},
 };
@@ -37,7 +37,7 @@ pub struct Node {
     pub username: String,
     storage: Arc<Storage>,
     client_socket: SocketAddr,
-    peers: Arc<Mutex<Vec<Peer>>>,
+    peers: Arc<Mutex<Vec<HdnAgent>>>,
 }
 
 impl Node {
@@ -74,7 +74,7 @@ impl Node {
                 Ok((stream, addr)) => {
                     let mut node = self.clone();
                     pool.execute(move || {
-                        node.handle_client(Client::new(addr, stream));
+                        node.handle_client(HdnAgent::new(addr, stream));
                     });
                 }
                 Err(err) => {
@@ -84,7 +84,7 @@ impl Node {
         }
     }
 
-    fn handle_client(&mut self, mut client: Client) {
+    fn handle_client(&mut self, mut client: HdnAgent) {
         client.send(&Greeting {
             student_name: &self.username,
         });
@@ -107,7 +107,7 @@ impl Node {
         }
     }
 
-    fn handle_peer(&mut self, mut peer: Peer) {
+    fn handle_peer(&mut self, mut peer: HdnAgent) {
         loop {
             let update = peer.try_read::<PeerUpdate>().unwrap();
             self.storage
@@ -146,7 +146,7 @@ impl Node {
     }
 }
 
-fn setup_network(config: &NodeConfig) -> Arc<Mutex<Vec<Peer>>> {
+fn setup_network(config: &NodeConfig) -> Arc<Mutex<Vec<HdnAgent>>> {
     let (nodes, id, port) = (&config.nodes, config.id, config.peer_port);
     if nodes.len() < 2 {
         return Arc::new(Mutex::new(Vec::new()));
@@ -171,13 +171,13 @@ fn setup_network(config: &NodeConfig) -> Arc<Mutex<Vec<Peer>>> {
     peers
 }
 
-fn connect_to_peer(addr: SocketAddr, peers: Arc<Mutex<Vec<Peer>>>) {
+fn connect_to_peer(addr: SocketAddr, peers: Arc<Mutex<Vec<HdnAgent>>>) {
     loop {
         const TIMEOUT_SECS: u64 = 3;
         let connection = TcpStream::connect_timeout(&addr, Duration::from_secs(TIMEOUT_SECS));
         if let Ok(stream) = connection {
             let mut peers = peers.lock().unwrap();
-            peers.push(Peer::new(addr, stream));
+            peers.push(HdnAgent::new(addr, stream));
             break;
         }
     }
@@ -186,14 +186,14 @@ fn connect_to_peer(addr: SocketAddr, peers: Arc<Mutex<Vec<Peer>>>) {
 fn try_accept_peer_connection(
     listener: &TcpListener,
     nodes: &HashSet<IpAddr>,
-    peers: Arc<Mutex<Vec<Peer>>>,
+    peers: Arc<Mutex<Vec<HdnAgent>>>,
 ) -> Option<IpAddr> {
     let connection = listener.accept();
     if let Ok((stream, addr)) = connection {
         let ip = addr.ip();
         if nodes.contains(&ip) {
             let mut peers = peers.lock().unwrap();
-            peers.push(Peer::new(addr, stream));
+            peers.push(HdnAgent::new(addr, stream));
             return Some(ip);
         }
     }
