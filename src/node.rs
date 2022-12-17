@@ -1,5 +1,5 @@
 use crate::{
-    agent::{HdnAgent},
+    agent::HdnAgent,
     messages::{Greeting, Load, PeerUpdate, Request, Response, Store},
     storage::{Storage, Time},
 };
