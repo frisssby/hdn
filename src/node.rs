@@ -4,30 +4,29 @@ use crate::{
     storage::{Storage, Time},
 };
 
-use log::error;
+use log::{error, info};
 use serde::Deserialize;
 use std::{
     collections::HashSet,
-    env, fs,
+    fs,
     net::{IpAddr, SocketAddr, TcpListener, TcpStream},
+    path::Path,
     sync::{Arc, Mutex},
     time::Duration,
 };
 use threadpool::ThreadPool;
 
 #[derive(Deserialize, Debug)]
-pub struct NodeConfig {
+pub struct NetworkConfig {
     pub user: String,
     pub nodes: Vec<IpAddr>,
-    pub id: usize,
     pub client_port: u16,
     pub peer_port: u16,
 }
 
-impl NodeConfig {
-    pub fn build() -> NodeConfig {
-        let config_path = env::var("HDN_CONFIG").unwrap();
-        let data = fs::read(config_path).expect("failed to read configuration file");
+impl NetworkConfig {
+    pub fn build(config: &Path) -> Self {
+        let data = fs::read(config).expect("failed to read configuration file");
         serde_json::from_slice(&data).expect("failed to parse configuration file")
     }
 }
@@ -43,10 +42,10 @@ pub struct Node {
 impl Node {
     const MAX_CLIENTS: usize = 100;
 
-    pub fn init(config: NodeConfig) -> Self {
-        let peers = setup_network(&config);
+    pub fn init(config: NetworkConfig, node_id: usize) -> Self {
+        let peers = setup_network(&config, node_id);
         assert!(peers.lock().unwrap().len() + 1 == config.nodes.len());
-        let ip = config.nodes[config.id];
+        let ip = config.nodes[node_id];
 
         Node {
             username: config.user,
@@ -57,6 +56,7 @@ impl Node {
     }
 
     pub fn launch(&self) {
+        info!("Starting server on {}", self.client_socket);
         let peers = self.peers.lock().unwrap();
         let pool = ThreadPool::new(Node::MAX_CLIENTS + peers.len());
         for peer in peers.iter().cloned() {
@@ -88,11 +88,18 @@ impl Node {
         client.send(&Greeting {
             student_name: &self.username,
         });
+        info!("Connection established with {}", client.addr.ip());
         loop {
             let request = client.try_read::<Request>();
             let response = match request {
                 Ok(request) => match request {
-                    Request::Store(request) => self.on_store_request(&request),
+                    Request::Store(request) => {
+                        info!(
+                            "Received request to store hash {} by key {}",
+                            request.hash, request.key
+                        );
+                        self.on_store_request(&request)
+                    }
                     Request::Load(request) => self.on_load_request(&request),
                 },
                 Err(err) => {
@@ -146,22 +153,22 @@ impl Node {
     }
 }
 
-fn setup_network(config: &NodeConfig) -> Arc<Mutex<Vec<HdnAgent>>> {
-    let (nodes, id, port) = (&config.nodes, config.id, config.peer_port);
+fn setup_network(config: &NetworkConfig, node_id: usize) -> Arc<Mutex<Vec<HdnAgent>>> {
+    let (nodes, port) = (&config.nodes, config.peer_port);
     if nodes.len() < 2 {
         return Arc::new(Mutex::new(Vec::new()));
     }
 
     let peers = Arc::new(Mutex::new(Vec::new()));
     let pool = ThreadPool::new(nodes.len() - 1);
-    for ip in nodes[id + 1..].iter() {
+    for ip in nodes[node_id + 1..].iter() {
         let addr = SocketAddr::new(*ip, port);
         let peers = peers.clone();
         pool.execute(move || connect_to_peer(addr, peers));
     }
 
-    let peer_listener = TcpListener::bind(SocketAddr::new(nodes[id], port)).unwrap();
-    let mut awaited = HashSet::from_iter(nodes[0..id].iter().cloned());
+    let peer_listener = TcpListener::bind(SocketAddr::new(nodes[node_id], port)).unwrap();
+    let mut awaited = HashSet::from_iter(nodes[0..node_id].iter().cloned());
     while !awaited.is_empty() {
         if let Some(peer) = try_accept_peer_connection(&peer_listener, &awaited, peers.clone()) {
             awaited.remove(&peer);
