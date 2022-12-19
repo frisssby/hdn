@@ -9,8 +9,7 @@ use std::path::PathBuf;
 struct Cli {
     #[arg(long, value_name = "FILE")]
     config: PathBuf,
-
-    #[arg(long, value_name = "SERVER ID")]
+    #[arg(long, value_name = "SERVER_ID")]
     id: usize,
 }
 

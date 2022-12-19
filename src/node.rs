@@ -26,8 +26,8 @@ pub struct NetworkConfig {
 
 impl NetworkConfig {
     pub fn build(config: &Path) -> Self {
-        let data = fs::read(config).expect("failed to read configuration file");
-        serde_json::from_slice(&data).expect("failed to parse configuration file")
+        let data = fs::read(config).expect("fail to read configuration file");
+        serde_json::from_slice(&data).expect("fail to parse configuration file")
     }
 }
 
@@ -43,6 +43,7 @@ impl Node {
     const MAX_CLIENTS: usize = 100;
 
     pub fn init(config: NetworkConfig, node_id: usize) -> Self {
+        info!("initialize server node with config {config:?} and id = {node_id}");
         let peers = setup_network(&config, node_id);
         assert!(peers.lock().unwrap().len() + 1 == config.nodes.len());
         let ip = config.nodes[node_id];
@@ -56,7 +57,7 @@ impl Node {
     }
 
     pub fn launch(&self) {
-        info!("Starting server on {}", self.client_socket);
+        info!("start server on {}", self.client_socket.ip());
         let peers = self.peers.lock().unwrap();
         let pool = ThreadPool::new(Node::MAX_CLIENTS + peers.len());
         for peer in peers.iter().cloned() {
@@ -73,12 +74,13 @@ impl Node {
             match connection {
                 Ok((stream, addr)) => {
                     let mut node = self.clone();
+                    info!("establish connection with client {}", addr.ip());
                     pool.execute(move || {
                         node.handle_client(HdnAgent::new(addr, stream));
                     });
                 }
                 Err(err) => {
-                    error!("failed to accept connection from client: {err}");
+                    error!("fail to accept connection from client: {err}");
                 }
             }
         }
@@ -88,35 +90,45 @@ impl Node {
         client.send(&Greeting {
             student_name: &self.username,
         });
-        info!("Connection established with {}", client.addr.ip());
+        info!("send greeting to {}", client.addr.ip());
         loop {
             let request = client.try_read::<Request>();
             let response = match request {
                 Ok(request) => match request {
                     Request::Store(request) => {
                         info!(
-                            "Received request to store hash {} by key {}",
-                            request.hash, request.key
+                            "receive request from client {} to store hash \"{}\" by key \"{}\"",
+                            client.addr, request.hash, request.key
                         );
                         self.on_store_request(&request)
                     }
-                    Request::Load(request) => self.on_load_request(&request),
+                    Request::Load(request) => {
+                        info!(
+                            "receive request from client {} to load hash by key \"{}\"",
+                            client.addr, request.key
+                        );
+                        self.on_load_request(&request)
+                    }
                 },
                 Err(err) => {
                     if err.is_eof() || err.is_io() {
+                        error!("socket error from client {}: {}\n", client.addr.ip(), err);
                         panic!("{err}");
                     } else {
+                        error!("");
                         Response::InvalidRequest
                     }
                 }
             };
             client.send(&response);
+            info!("send response: {response:?}")
         }
     }
 
     fn handle_peer(&mut self, mut peer: HdnAgent) {
         loop {
             let update = peer.try_read::<PeerUpdate>().unwrap();
+            info!("receive update {:?} from peer {}", update, peer.addr.ip());
             self.storage
                 .synchronize(update.key, update.hash, update.time);
         }
@@ -183,6 +195,7 @@ fn connect_to_peer(addr: SocketAddr, peers: Arc<Mutex<Vec<HdnAgent>>>) {
         const TIMEOUT_SECS: u64 = 3;
         let connection = TcpStream::connect_timeout(&addr, Duration::from_secs(TIMEOUT_SECS));
         if let Ok(stream) = connection {
+            info!("establish connection with peer {}", addr.ip());
             let mut peers = peers.lock().unwrap();
             peers.push(HdnAgent::new(addr, stream));
             break;
@@ -199,6 +212,7 @@ fn try_accept_peer_connection(
     if let Ok((stream, addr)) = connection {
         let ip = addr.ip();
         if nodes.contains(&ip) {
+            info!("establish connection with peer {}", ip);
             let mut peers = peers.lock().unwrap();
             peers.push(HdnAgent::new(addr, stream));
             return Some(ip);
