@@ -1,0 +1,10 @@
+{
+    "user": "Elina Safarova",
+    "nodes": [
+        "moscow",
+        "boston",
+        "tokyo"
+    ],
+    "client_port": 43000,
+    "peer_port": 42000
+}
