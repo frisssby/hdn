@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 chrono = {version = "*", features = ["serde"]}
 clap = {version = "*", features = ["derive"]}
+dns-lookup = "*"
 log = "*"
 serde = { version = "*", features = ["derive"] }
 serde_json = { version = "*", features = ["std"] } 

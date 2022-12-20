@@ -7,9 +7,9 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
-    #[arg(long, value_name = "FILE")]
+    #[arg(long, value_name = "PATH")]
     config: PathBuf,
-    #[arg(long, value_name = "SERVER_ID")]
+    #[arg(long, value_name = "NODE_ID")]
     id: usize,
 }
 

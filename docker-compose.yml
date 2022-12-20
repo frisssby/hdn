@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+    moscow:
+        build:
+            context: .
+        volumes:
+            - ./config/config.json:/tmp/config.json
+        command: ["--id", "0"]
+        hostname: moscow
+        ports:
+            - 43000:43000
+
+    boston:
+        build:
+            context: .
+        volumes:
+            - ./config/config.json:/tmp/config.json
+        command: ["--id", "1"]
+        hostname: boston
+        ports:
+            - 43001:43000
+
+    tokyo:
+        build:
+            context: .
+        volumes:
+            - ./config/config.json:/tmp/config.json
+        command: ["--id", "2"]
+        hostname: tokyo
+        ports:
+            - 43002:43000

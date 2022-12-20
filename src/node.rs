@@ -4,6 +4,7 @@ use crate::{
     storage::{Storage, Time},
 };
 
+use dns_lookup::lookup_host;
 use log::{error, info};
 use serde::Deserialize;
 use std::{
@@ -19,7 +20,7 @@ use threadpool::ThreadPool;
 #[derive(Deserialize, Debug)]
 pub struct NetworkConfig {
     pub user: String,
-    pub nodes: Vec<IpAddr>,
+    pub nodes: Vec<String>,
     pub client_port: u16,
     pub peer_port: u16,
 }
@@ -39,19 +40,31 @@ pub struct Node {
     peers: Arc<Mutex<Vec<HdnAgent>>>,
 }
 
+fn resolve_ip(host: &str) -> Option<IpAddr> {
+    host.parse().ok().or(lookup_host(host)
+        .ok()
+        .and_then(|ips| ips.into_iter().next()))
+}
+
 impl Node {
     const MAX_CLIENTS: usize = 100;
 
     pub fn init(config: NetworkConfig, node_id: usize) -> Self {
         info!("initialize server node with config {config:?} and id = {node_id}");
-        let peers = setup_network(&config, node_id);
+
+        let nodes: Vec<_> = config
+            .nodes
+            .iter()
+            .map(|host| resolve_ip(host).expect("fail to resolve ip address"))
+            .collect();
+
+        let peers = setup_network(&nodes, config.peer_port, node_id);
         assert!(peers.lock().unwrap().len() + 1 == config.nodes.len());
-        let ip = config.nodes[node_id];
 
         Node {
             username: config.user,
             storage: Arc::new(Storage::new()),
-            client_socket: SocketAddr::new(ip, config.client_port),
+            client_socket: SocketAddr::new(nodes[node_id], config.client_port),
             peers,
         }
     }
@@ -165,8 +178,7 @@ impl Node {
     }
 }
 
-fn setup_network(config: &NetworkConfig, node_id: usize) -> Arc<Mutex<Vec<HdnAgent>>> {
-    let (nodes, port) = (&config.nodes, config.peer_port);
+fn setup_network(nodes: &[IpAddr], peer_port: u16, node_id: usize) -> Arc<Mutex<Vec<HdnAgent>>> {
     if nodes.len() < 2 {
         return Arc::new(Mutex::new(Vec::new()));
     }
@@ -174,12 +186,12 @@ fn setup_network(config: &NetworkConfig, node_id: usize) -> Arc<Mutex<Vec<HdnAge
     let peers = Arc::new(Mutex::new(Vec::new()));
     let pool = ThreadPool::new(nodes.len() - 1);
     for ip in nodes[node_id + 1..].iter() {
-        let addr = SocketAddr::new(*ip, port);
+        let addr = SocketAddr::new(*ip, peer_port);
         let peers = peers.clone();
         pool.execute(move || connect_to_peer(addr, peers));
     }
 
-    let peer_listener = TcpListener::bind(SocketAddr::new(nodes[node_id], port)).unwrap();
+    let peer_listener = TcpListener::bind(SocketAddr::new(nodes[node_id], peer_port)).unwrap();
     let mut awaited = HashSet::from_iter(nodes[0..node_id].iter().cloned());
     while !awaited.is_empty() {
         if let Some(peer) = try_accept_peer_connection(&peer_listener, &awaited, peers.clone()) {

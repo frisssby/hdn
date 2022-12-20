@@ -1,6 +1,6 @@
-# **hdn**
+# hdn
 
-Hash delivery network is a tcp server that supports storing hashes in a remote storage and loading them from it. Supports running on several nodes with data synchronization.
+Hash delivery network is a distributed key-value storage, which is built as a TCP network that synchronizes data among the nodes and supports storing hashes in a remote storage and loading them from it.
 
 ## Config
 
@@ -14,22 +14,22 @@ Server requires a configuration file which is supposed to have the following str
         "127.0.0.2",
         "127.0.0.3"
     ],
-    "id": 0, // index of the server in the nodes list 
-    "client_port": 43500,
-    "peer_port": 42300
+    "client_port": 43000,
+    "peer_port": 42000
 }
 ```
-
-Before launching a server, put the path to the configuration file to the **HDN_CONFIG**
-environment variable.
 
 ## Launching
 
 ```bash
 git clone git@github.com:frisssby/hdn.git
 cd hdn
-cargo run
+cargo run -- --config <PATH> --id <NODE_ID>
 ```
+
+## Simulation of a network with three servers
+
+The repository also provides a docker image that simulates working of the three-node *hdn* network.
 
 ## Protocol
 
