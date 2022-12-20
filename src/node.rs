@@ -125,8 +125,8 @@ impl Node {
                 },
                 Err(err) => {
                     if err.is_eof() || err.is_io() {
-                        error!("socket error from client {}: {}\n", client.addr.ip(), err);
-                        panic!("{err}");
+                        error!("socket error from client {}: {}", client.addr.ip(), err);
+                        return;
                     } else {
                         error!("");
                         Response::InvalidRequest
