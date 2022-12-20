@@ -27,9 +27,22 @@ cd hdn
 cargo run -- --config <PATH> --id <NODE_ID>
 ```
 
+**PATH** is the location of the configuration file.
+
+**NODE_ID** is the 0-based index of the node in the configuration file.
+
 ## Simulation of a network with three servers
 
-The repository also provides a docker image that simulates working of the three-node *hdn* network.
+The repository also provides a simulation of the three-node *hdn* storage working in a docker container.
+
+To launch it, run
+
+```bash
+cd simulation
+docker-compose up
+```
+
+This command sets up three servers responsible for three different geolocations. They will be listening for TCP connections on `localhost:4300,4301,4302`.
 
 ## Protocol
 
@@ -39,7 +52,7 @@ After the successful connection, the client receives a greeting message:
 
 ```json
   {
-    "student_name" : "Elina Safarova",
+    "student_name" : "Elina Safarova"
   }
 ```
 
@@ -51,7 +64,7 @@ There are two types of valid requests:
     {
       "request_type": "store",
       "key": "some_key",
-      "hash": "0b672dd94fd3da6a8d404b66ee3f0c8",
+      "hash": "0b672dd94fd3da6a8d404b66ee3f0c8"
     }
     ```
 
@@ -59,7 +72,7 @@ There are two types of valid requests:
 
      ```json
     {
-      "response_status": "success",
+      "response_status": "success"
     }
     ```
 
@@ -68,7 +81,7 @@ There are two types of valid requests:
     ```json
     {
       "request_type": "load",
-      "key": "some_key",
+      "key": "some_key"
     }
     ```
 
@@ -78,7 +91,7 @@ There are two types of valid requests:
     {
       "response_status": "success",
       "requested_key": "some_key",
-      "requested_hash": "0b672dd94fd3da6a8d404b66ee3f0c83",
+      "requested_hash": "0b672dd94fd3da6a8d404b66ee3f0c83"
     }
     ```
 
@@ -86,7 +99,7 @@ There are two types of valid requests:
 
     ```json
     {
-      "response_status": "key not found",
+      "response_status": "key not found"
     }
     ```
 
@@ -94,6 +107,6 @@ There are two types of valid requests:
 
     ```json
     {
-      "response_status": "invalid request",
+      "response_status": "invalid request"
     }
     ```
