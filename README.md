@@ -42,7 +42,7 @@ cd simulation
 docker-compose up
 ```
 
-This command sets up three servers responsible for three different geolocations. They will be listening for TCP connections on `localhost:4300,4301,4302`.
+This command sets up three servers responsible for three different geolocations. They will be listening for TCP connections on `localhost:43001,43002,43003`.
 
 ## Protocol
 
